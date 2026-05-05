@@ -15,6 +15,7 @@ import {
 import { formatDurationFromMs, countBehavioralAttempts } from './interview/utils.js'
 import { useAutosaveHeartbeat } from './hooks/useAutosaveHeartbeat.js'
 import { useInterviewTabGuard } from './hooks/useInterviewTabGuard.js'
+import { useRecordingWaveform } from './hooks/useRecordingWaveform.js'
 import { TabLeaveBanner } from './components/overlays/TabLeaveBanner.jsx'
 import { InstructionsModal } from './components/overlays/InstructionsModal.jsx'
 import { InterviewHeader } from './components/layout/InterviewHeader.jsx'
@@ -65,6 +66,7 @@ function App() {
   const previewVideoRef = useRef(null)
   const setupVideoRef = useRef(null)
   const floatingVideoRef = useRef(null)
+  const recordingAudioStreamRef = useRef(null)
 
   const [candidate, setCandidate] = useState({
     fullName: 'Shalini Chauhan',
@@ -81,6 +83,10 @@ function App() {
     setTabLeaveWarning,
   })
   useAutosaveHeartbeat(setAutoSaveAt)
+  const { levels: waveformLevels, pitchHz: waveformPitchHz } = useRecordingWaveform(
+    recording,
+    recordingAudioStreamRef,
+  )
 
   const progress = useMemo(() => ((step + 1) / STEPS.length) * 100, [step])
   const autoSaveLabel = useMemo(() => new Date(autoSaveAt).toLocaleTimeString(), [autoSaveAt])
@@ -304,6 +310,7 @@ function App() {
     stopRecordingTimer()
     recordingChunksRef.current = []
     recordingSecondsRef.current = 0
+    recordingAudioStreamRef.current = null
     setRecording(false)
     setRecordingSeconds(0)
     setRecordingFeedback('')
@@ -332,6 +339,7 @@ function App() {
       }
 
       const audioStream = new MediaStream(audioTracks)
+      recordingAudioStreamRef.current = audioStream
       const recorder = new MediaRecorder(audioStream)
       mediaRecorderRef.current = recorder
       recordingChunksRef.current = []
@@ -378,6 +386,7 @@ function App() {
         })
       }, 1000)
     } catch (error) {
+      recordingAudioStreamRef.current = null
       setRecording(false)
       stopRecordingTimer()
       setRecordingFeedback(error instanceof Error ? error.message : 'Could not start recording.')
@@ -420,6 +429,7 @@ function App() {
       }
     }
     mediaRecorderRef.current = null
+    recordingAudioStreamRef.current = null
 
     if (previewVideoRef.current) previewVideoRef.current.srcObject = null
     if (setupVideoRef.current) setupVideoRef.current.srcObject = null
@@ -613,6 +623,8 @@ function App() {
           resetAnswerUi={resetAnswerUi}
           finishInterview={finishInterview}
           onMoveToCoding={() => setStep(4)}
+          waveformLevels={waveformLevels}
+          waveformPitchHz={waveformPitchHz}
         />
       )
     }
@@ -645,15 +657,6 @@ function App() {
         isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-100 text-slate-900'
       }`}
     >
-      {tabLeaveWarning && (step === 3 || step === 4) && !interviewCompleted && (
-        <TabLeaveBanner
-          isDark={isDark}
-          message={tabLeaveWarning}
-          tabAwayEvents={tabAwayEvents}
-          onDismiss={() => setTabLeaveWarning('')}
-        />
-      )}
-
       {hasStream && step >= 3 && (
         <FloatingCandidatePreview
           isDark={isDark}
@@ -663,11 +666,17 @@ function App() {
           emotionLabel={emotionLabel}
         />
       )}
-      <div
-        className={`mx-auto max-w-6xl space-y-6 ${
-          tabLeaveWarning && (step === 3 || step === 4) && !interviewCompleted ? 'pt-28 sm:pt-24' : ''
-        }`}
-      >
+      <div className="mx-auto max-w-6xl space-y-6">
+        {tabLeaveWarning && (step === 3 || step === 4) && !interviewCompleted && (
+          <div className="scroll-mt-4">
+            <TabLeaveBanner
+              isDark={isDark}
+              message={tabLeaveWarning}
+              tabAwayEvents={tabAwayEvents}
+              onDismiss={() => setTabLeaveWarning('')}
+            />
+          </div>
+        )}
         <InterviewHeader
           cardClass={cardClass}
           mutedText={mutedText}

@@ -30,6 +30,8 @@ export function AiInterviewStep({
   resetAnswerUi,
   finishInterview,
   onMoveToCoding,
+  waveformLevels,
+  waveformPitchHz,
 }) {
   const typingAnalysis = typingAnalysisByQuestion[questionIndex] ?? 'Analyzing response...'
   const useCase = questionUseCases[questionIndex] ?? 'Use-case: evaluate communication and reasoning.'
@@ -158,16 +160,36 @@ export function AiInterviewStep({
 
           {(recording || Boolean(currentAnswerUrl)) && (
             <div className="mt-3 rounded-xl border border-slate-700/60 bg-slate-950/40 p-3">
-              <p className="mb-2 text-xs text-slate-300">Voice waveform (demo)</p>
-              <div className="flex h-10 items-end justify-between gap-1">
-                {Array.from({ length: 28 }).map((_, idx) => (
-                  <div
-                    key={`wave-${questionIndex}-${idx}`}
-                    className="hs-wave-bar w-1 rounded-full bg-linear-to-b from-cyan-400 to-violet-500"
-                    style={{ animationDelay: `${idx * 45}ms` }}
-                  />
-                ))}
+              <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
+                <p className="text-xs text-slate-300">
+                  {recording ? 'Live spectrum' : 'Last take'}
+                </p>
+                {recording && waveformPitchHz != null && (
+                  <p className={`text-[11px] tabular-nums ${mutedText}`}>
+                    ~{waveformPitchHz} Hz <span className="opacity-80">(rough pitch)</span>
+                  </p>
+                )}
               </div>
+              <div className="flex h-11 items-end justify-center gap-px sm:gap-0.5" aria-hidden="true">
+                {(waveformLevels ?? []).map((level, idx) => {
+                  const h = Math.max(3, Math.round(4 + level * 36))
+                  return (
+                    <div
+                      key={`wave-${questionIndex}-${idx}`}
+                      className="w-[3px] shrink-0 rounded-full bg-linear-to-b from-cyan-400 to-violet-500 motion-safe:transition-[height,opacity] motion-safe:duration-75"
+                      style={{
+                        height: `${h}px`,
+                        opacity: recording ? 0.55 + level * 0.45 : 0.35 + level * 0.35,
+                      }}
+                    />
+                  )
+                })}
+              </div>
+              <p className={`mt-2 text-[11px] leading-snug ${mutedText}`}>
+                {recording
+                  ? 'Bars map log-spaced frequency bands from your mic (Web Audio). Pitch is estimated from the strongest bin in the speech range — not studio-grade.'
+                  : 'Spectrum freezes after submit; use playback to hear the clip.'}
+              </p>
             </div>
           )}
 
